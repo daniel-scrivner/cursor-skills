@@ -1,0 +1,294 @@
+---
+description: Human-in-the-loop AI coding - invoke repeatedly to work through tasks one at a time
+globs:
+alwaysApply: false
+---
+
+# @ralph-manual - Human-in-the-Loop Task Runner
+
+Work through a task list (PRD) one story at a time within Cursor. Invoke this skill repeatedly - each invocation completes ONE task.
+
+**No external dependencies** - works entirely within Cursor.
+
+## Quick Start
+
+1. **First time**: Create `scripts/ralph/` directory with prd.json and progress.txt (see Setup below)
+2. **Each iteration**: Invoke `@ralph-manual` in Cursor chat
+3. **Review**: Check the changes, then invoke again for the next task
+4. **Done**: When all tasks pass, Ralph will tell you
+
+---
+
+## When Invoked: Execute This Workflow
+
+### Step 1: Read Current State
+
+Read these files to understand context:
+- `scripts/ralph/prd.json` - Task list
+- `scripts/ralph/progress.txt` - Previous learnings (especially Codebase Patterns section)
+
+### Step 2: Check Branch
+
+Verify you're on the correct branch specified in `prd.json`. If not:
+```bash
+git checkout -b [branchName from prd.json]
+# or
+git checkout [branchName from prd.json]
+```
+
+### Step 3: Check PR Status (If PR Exists)
+
+Before selecting a task, check if there's an open PR for this branch:
+- **Inline comments** - Are there unaddressed review comments?
+- **CI status** - Are all checks passing? (If flaky, rerun with `gh run rerun`)
+- **Merge conflicts** - Do any need resolution?
+
+If there are unaddressed comments or failing CI, prioritize fixing those before picking a new task.
+
+### Step 4: Select ONE Task
+
+From `prd.json`, find the highest priority (lowest number) story where `passes: false`.
+
+If ALL stories have `passes: true`:
+1. Verify PR readiness by following **@pr-workflow**
+2. Check: All comments addressed? CI green? No merge conflicts? No extra changes?
+3. If PR is ready, respond:
+   > ✅ **All tasks complete and PR is ready!**
+   > 
+   > Completion verification:
+   > - All prd.json stories: passing
+   > - All inline comments: addressed and responded to
+   > - All CI checks: passing
+   > - Merge conflicts: none
+   > - Scope: only relevant changes
+   
+4. If PR needs work, address those issues first.
+
+### Step 5: Implement the Task
+
+Implement ONLY the selected story:
+- Follow the acceptance criteria exactly
+- Use patterns from progress.txt Codebase Patterns section
+- Write tests if required by acceptance criteria
+- Keep changes focused on this ONE story
+
+### Step 6: Run Validation
+
+Execute appropriate checks based on project type:
+
+**If Makefile exists:**
+```bash
+make typecheck
+make test
+```
+
+**JavaScript/TypeScript (no Makefile):**
+```bash
+pnpm typecheck
+pnpm test
+```
+
+**Python:**
+```bash
+mypy .
+pytest
+```
+
+If checks fail, fix the issues before proceeding.
+
+### Step 7: Update AGENTS.md (If Applicable)
+
+If you discovered a reusable pattern or gotcha, update the AGENTS.md file in the directory you modified:
+
+**Worth adding:**
+- "When modifying X, also update Y"
+- "This module requires pattern Z"
+- "Tests need specific setup"
+
+**Don't add:**
+- Story-specific implementation details
+- Temporary debugging notes
+
+### Step 8: Commit
+
+```bash
+git add -A
+git commit -m "feat: [STORY_ID] - [Story Title]"
+```
+
+### Step 9: Update prd.json
+
+Set `passes: true` for the completed story:
+```json
+{
+  "id": "US-001",
+  "passes": true,
+  "notes": "Any relevant notes about the implementation"
+}
+```
+
+### Step 10: Update progress.txt
+
+**APPEND** to the end of `scripts/ralph/progress.txt`:
+
+```markdown
+---
+## [TODAY'S DATE] - [Story ID]: [Title]
+- **Implemented**: Brief description
+- **Files changed**: List files
+- **Learnings**:
+  - Any patterns discovered
+  - Gotchas encountered
+```
+
+If you discovered a reusable pattern, also add it to the `## Codebase Patterns` section at the TOP of progress.txt.
+
+### Step 11: Report Status
+
+Summarize what was done:
+> ✅ **Completed [STORY_ID]: [Title]**
+> - Files modified: [list]
+> - Tests: passing
+> - Remaining tasks: [count]
+> - PR status: [any pending comments or CI issues]
+>
+> Invoke `@ralph-manual` again to continue to the next task.
+
+If this was the **last task**, also verify PR readiness:
+> 🎉 **All tasks complete!**
+> 
+> **PR Readiness Check** (per @pr-workflow):
+> - [ ] All inline comments addressed and responded to
+> - [ ] All CI checks passing
+> - [ ] No merge conflicts
+> - [ ] Only relevant changes in PR
+> - [ ] No shortcuts taken
+>
+> If all checks pass, the PR is ready for review/merge.
+
+---
+
+## First-Time Setup
+
+If `scripts/ralph/` doesn't exist, create it:
+
+### Create `scripts/ralph/prd.json`
+
+```json
+{
+  "branchName": "ralph/feature-name",
+  "description": "What this feature set accomplishes",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Short, specific task title",
+      "acceptanceCriteria": [
+        "Specific, testable criterion",
+        "Another criterion",
+        "typecheck passes",
+        "tests pass"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}
+```
+
+### Create `scripts/ralph/progress.txt`
+
+```markdown
+# Ralph Progress Log
+
+Started: [DATE]
+Branch: [BRANCH_NAME]
+
+## Codebase Patterns
+
+(Discovered patterns will be added here)
+
+## Key Files
+
+(Important files for this feature)
+
+---
+```
+
+---
+
+## Task Design Guidelines
+
+### Size Tasks Correctly
+
+Each task should:
+- Be completable in 5-15 minutes
+- Fit in a single commit
+- Have clear, testable acceptance criteria
+
+**❌ Too Big:**
+- "Build user authentication"
+- "Create dashboard page"
+
+**✅ Right Size:**
+- "Add email input with validation"
+- "Add password field with show/hide toggle"
+- "Add login button with loading state"
+
+### Write Clear Acceptance Criteria
+
+**❌ Vague:**
+- "Users can log in"
+- "Form works correctly"
+
+**✅ Explicit:**
+- "Email field validates format on blur"
+- "Error message appears below field on invalid input"
+- "Submit button disabled until form is valid"
+- "typecheck passes"
+- "unit tests pass"
+
+---
+
+## Monitoring Progress
+
+Check status anytime:
+```bash
+# Task status
+cat scripts/ralph/prd.json | jq '.userStories[] | {id, title, passes}'
+
+# Completed count
+cat scripts/ralph/prd.json | jq '[.userStories[] | select(.passes == true)] | length'
+
+# Remaining count  
+cat scripts/ralph/prd.json | jq '[.userStories[] | select(.passes == false)] | length'
+```
+
+---
+
+## Critical Rules
+
+- **ONE task per invocation** - Complete one story, then stop
+- **Tests must pass** - Never mark a task complete with failing tests
+- **Don't remove existing code** - Unless explicitly required
+- **Don't remove comments** - Preserve existing comments
+- **Prefer for loops** - Over forEach/filter/map
+- **Check progress.txt first** - Use established patterns
+- **Commit before marking done** - Git commit happens before updating prd.json
+- **Address ALL PR comments** - Check for and respond to inline comments each invocation
+- **No shortcuts** - Don't fake results or skip verification to finish faster
+- **Reference @pr-workflow** - For final PR verification when all tasks complete
+
+---
+
+## Comparison with @ralph-hybrid
+
+| Aspect | @ralph-manual | @ralph-hybrid |
+|--------|---------------|---------------|
+| How to run | Invoke in Cursor chat | Run bash script in terminal |
+| Autonomy | One task, then stops | Loops until all done |
+| Human oversight | Review after each task | Review at the end |
+| Best for | Learning, steering, complex tasks | AFK work, overnight runs |
+| Dependencies | Just Cursor | Claude CLI required |
+| PR handling | Check comments each invocation | Monitors throughout loop |
+| Completion | Tasks done + @pr-workflow check | Two-phase: tasks + PR ready |
