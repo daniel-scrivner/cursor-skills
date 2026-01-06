@@ -1,0 +1,333 @@
+---
+description: Scaffold autonomous AI coding loop (Ralph Wiggum technique) using Claude CLI for true autonomy
+globs:
+alwaysApply: false
+---
+
+# @ralph-hybrid - Autonomous AI Coding Loop
+
+Scaffold and run a fully autonomous coding agent that works through a task list (PRD) one story at a time, implementing, testing, committing, and learning as it goes.
+
+**Requires**: Claude CLI installed (`claude --dangerously-skip-permissions`)
+
+## Quick Start
+
+1. **Scaffold**: Invoke `@ralph-hybrid` to create `scripts/ralph/` in your project
+2. **Configure**: Edit `scripts/ralph/prd.json` with your tasks
+3. **Run**: `./scripts/ralph/ralph.sh 25` (runs up to 25 iterations)
+
+---
+
+## When Invoked: Scaffold These Files
+
+Create the following directory structure in the current project:
+
+### 1. Create `scripts/ralph/ralph.sh`
+
+```bash
+#!/bin/bash
+set -e
+
+MAX_ITERATIONS=${1:-10}
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+# Configurable AI CLI (default: Claude)
+AI_CLI="${AI_CLI:-claude}"
+AI_FLAGS="${AI_FLAGS:---dangerously-skip-permissions}"
+
+echo "🤖 Starting Ralph - Autonomous Coding Agent"
+echo "   Project: $PROJECT_ROOT"
+echo "   Max iterations: $MAX_ITERATIONS"
+echo "   AI CLI: $AI_CLI $AI_FLAGS"
+echo ""
+
+cd "$PROJECT_ROOT"
+
+for i in $(seq 1 $MAX_ITERATIONS); do
+  echo "═══════════════════════════════════════════"
+  echo "   Iteration $i of $MAX_ITERATIONS"
+  echo "═══════════════════════════════════════════"
+  
+  OUTPUT=$(cat "$SCRIPT_DIR/prompt.md" \
+    | $AI_CLI $AI_FLAGS 2>&1 \
+    | tee /dev/stderr) || true
+  
+  if echo "$OUTPUT" | grep -q "<promise>COMPLETE</promise>"; then
+    echo ""
+    echo "✅ All tasks complete!"
+    echo ""
+    cat "$SCRIPT_DIR/prd.json" | jq '.userStories[] | {id, title, passes}'
+    exit 0
+  fi
+  
+  echo ""
+  echo "⏳ Cooling down before next iteration..."
+  sleep 2
+done
+
+echo ""
+echo "⚠️  Max iterations ($MAX_ITERATIONS) reached"
+echo "    Some tasks may still be incomplete:"
+cat "$SCRIPT_DIR/prd.json" | jq '.userStories[] | select(.passes == false) | {id, title}'
+exit 1
+```
+
+**Make it executable**: `chmod +x scripts/ralph/ralph.sh`
+
+### 2. Create `scripts/ralph/prompt.md`
+
+````markdown
+# Ralph Agent Instructions
+
+You are Ralph, an autonomous coding agent. Work through the task list one story at a time.
+
+## Your Task (Single Iteration)
+
+1. **Read the PRD**: `scripts/ralph/prd.json`
+2. **Read progress**: `scripts/ralph/progress.txt` (check Codebase Patterns section first)
+3. **Check branch**: Ensure you're on the correct branch from `prd.json`
+4. **Pick ONE task**: Select the highest priority story where `passes: false`
+5. **Implement it**: Write the code for that ONE story
+6. **Run checks**: Execute typecheck and tests
+7. **Update AGENTS.md**: If you discovered reusable patterns, update relevant AGENTS.md files
+8. **Commit**: `git commit -m "feat: [ID] - [Title]"`
+9. **Mark complete**: Set `passes: true` in prd.json
+10. **Log learnings**: Append to progress.txt
+
+## PR Monitoring (During Loop)
+
+While working through tasks, monitor the PR for:
+- **Inline comments** where the requested change hasn't been pushed yet
+- **Inline comments** where the last message in the thread is not your response
+- **CI failures** - even seemingly unrelated ones (could be flakes, rerun with `gh pr checks` or `gh run rerun`)
+- **Merge conflicts** - resolve immediately if they appear
+- **Scope creep** - ensure PR contains only changes relevant to the PRD
+
+## Efficient CI Waiting
+
+Do NOT waste time sleeping while waiting on CI. Instead:
+- Trace through failing tests step-by-step, documenting the flow in progress.txt
+- Review your changes for potential improvements
+- Ensure the fix actually addresses the root cause, not just the symptom
+
+## Stop Condition (Two-Phase)
+
+### Phase 1: Task Completion
+All stories in prd.json must have `passes: true`.
+
+### Phase 2: PR Readiness (Reference @pr-workflow)
+After all tasks pass, verify PR is ready to merge:
+- All inline comments have been addressed AND responded to
+- All CI tests are passing (rerun flakes if needed with `gh` CLI)
+- No merge conflicts exist
+- PR contains only changes relevant to the functionality
+- No shortcuts or faked results to meet requirements
+
+When BOTH phases are complete, output exactly:
+```
+<promise>COMPLETE</promise>
+```
+
+**Completion Promise**: "All comments have been addressed, all changes addressing those comments have been pushed to the PR, and all CI tests are passing. There are no merge conflicts in my PR, and it contains only changes relevant to the functionality in the PR. I have not taken any shortcuts or faked anything to meet these requirements."
+
+If tasks remain OR PR is not ready, end your response normally after completing ONE task.
+
+## Validation Commands
+
+Detect project type and run appropriate checks:
+
+**If Makefile exists:**
+```bash
+make typecheck  # or make type-check
+make test
+```
+
+**Otherwise (JavaScript/TypeScript):**
+```bash
+pnpm typecheck
+pnpm test
+```
+
+**Python projects:**
+```bash
+mypy .
+pytest
+```
+
+All checks MUST pass before committing. If they fail, fix the issues first.
+
+## Progress Log Format
+
+APPEND to `scripts/ralph/progress.txt`:
+
+```markdown
+---
+## [DATE] - [Story ID]: [Title]
+- **Implemented**: Brief description of what was done
+- **Files changed**: List of modified files
+- **Learnings**:
+  - Pattern or gotcha discovered
+  - Any conventions to remember
+```
+
+## Codebase Patterns (Add to TOP of progress.txt)
+
+When you discover reusable patterns, add them to the `## Codebase Patterns` section at the TOP of progress.txt:
+
+```markdown
+## Codebase Patterns
+- Migrations: Always use IF NOT EXISTS
+- React refs: useRef<Timeout | null>(null)
+- API hooks: Use makeApiMutation from @web-monorepo/fetchers
+```
+
+## AGENTS.md Updates
+
+If you discover something worth preserving permanently, update the AGENTS.md file in the directory you modified:
+
+**Good additions:**
+- "When modifying X, also update Y"
+- "This module uses pattern Z"
+- "Tests require specific setup"
+
+**Don't add:**
+- Story-specific details
+- Temporary notes
+- Info already in progress.txt
+
+## Browser Testing (UI Changes)
+
+For UI changes, verify visually:
+1. Start dev server if not running
+2. Navigate to the relevant page
+3. Take a screenshot to verify the change
+4. Not complete until visually verified
+
+## Critical Rules
+
+- **ONE task per iteration** - Don't try to do multiple stories
+- **Small commits** - Each story = one commit
+- **Tests must pass** - Never commit failing tests
+- **Don't remove code** - Unless explicitly required by the task
+- **Don't remove comments** - Preserve existing comments
+- **Prefer for loops** - Over forEach/filter/map
+- **Use existing patterns** - Check progress.txt for established conventions
+- **Address ALL PR comments** - Don't ignore feedback, respond to every comment
+- **No shortcuts** - Don't fake results or skip verification steps
+- **Reference @pr-workflow** - For PR finalization, follow the @pr-workflow skill
+````
+
+### 3. Create `scripts/ralph/prd.json`
+
+```json
+{
+  "branchName": "ralph/feature-name",
+  "description": "Brief description of what this feature set accomplishes",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Example: Add login form",
+      "acceptanceCriteria": [
+        "Email and password input fields exist",
+        "Form validates email format",
+        "Submit button is disabled until valid",
+        "typecheck passes",
+        "tests pass"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Example: Add form submission handler",
+      "acceptanceCriteria": [
+        "Form calls auth API on submit",
+        "Loading state shown during request",
+        "Error message displayed on failure",
+        "typecheck passes",
+        "tests pass"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Depends on US-001"
+    }
+  ]
+}
+```
+
+### 4. Create `scripts/ralph/progress.txt`
+
+```markdown
+# Ralph Progress Log
+
+Started: [DATE]
+Branch: [BRANCH_NAME]
+
+## Codebase Patterns
+
+(Add discovered patterns here - Ralph will update this section)
+
+## Key Files
+
+(List important files for this feature)
+
+---
+
+(Ralph will append completed story logs below)
+```
+
+---
+
+## Task Sizing Guidelines
+
+Tasks must fit in a single context window. Break down large features:
+
+**❌ Too Big:**
+- "Build entire auth system"
+- "Implement user dashboard"
+
+**✅ Right Size:**
+- "Add login form UI"
+- "Add email validation"
+- "Add auth API hook"
+- "Add error handling"
+
+## Monitoring Progress
+
+```bash
+# Check task status
+cat scripts/ralph/prd.json | jq '.userStories[] | {id, title, passes}'
+
+# View learnings
+cat scripts/ralph/progress.txt
+
+# Recent commits
+git log --oneline -10
+```
+
+## Troubleshooting
+
+**Ralph keeps failing on the same task:**
+- Task may be too large - break it down
+- Check if acceptance criteria are clear enough
+- Look at progress.txt for error patterns
+
+**Tests keep failing:**
+- Ensure dev dependencies are installed
+- Check if tests require running services
+- Add specific test requirements to acceptance criteria
+- Check if it's a flaky test - rerun with `gh run rerun`
+
+**Ralph isn't committing:**
+- Verify branch name in prd.json matches current branch
+- Check if typecheck/tests are actually passing
+- Look for uncommitted changes blocking the commit
+
+**PR not completing:**
+- Check for unaddressed inline comments
+- Verify all CI checks are green (not just some)
+- Look for merge conflicts that need resolution
+- Ensure no extra/unrelated changes crept into the PR
+- Reference @pr-workflow for detailed PR verification steps
