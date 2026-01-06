@@ -1,0 +1,152 @@
+---
+description: Generate a detailed task list from user requirements for feature implementation
+globs:
+alwaysApply: false
+---
+
+# Generate Tasks Skill
+
+Generate a structured, step-by-step task list in Markdown format based on user requirements, feature requests, or existing documentation.
+
+## Output
+
+- **Format:** Markdown (`.md`)
+- **Location:** `./tasks/` directory in the relevant project
+- **Filename:** `tasks-[feature-name].md` (e.g., `tasks-user-profile-editing.md`)
+
+## Process
+
+### Phase 1: Analyze and Generate Parent Tasks
+
+1. **Receive Requirements:** Analyze the feature request, task description, or documentation provided by the user
+2. **Identify Context:** Determine which project/app this applies to and review relevant existing code patterns
+3. **Create Task File:** Generate the file with high-level parent tasks
+
+**Always include these standard tasks:**
+- **Task 0.0:** Create feature branch (unless user explicitly opts out)
+- **Task N.0 (Final):** Create pull request and merge (reference @pr-workflow)
+
+After generating parent tasks, inform the user:
+
+> "I have generated the high-level tasks based on your requirements. Ready to generate the sub-tasks? Respond with 'Go' to proceed."
+
+### Phase 2: Generate Sub-Tasks (After User Confirmation)
+
+Once the user responds with "Go":
+
+1. Break down each parent task into smaller, actionable sub-tasks
+2. Ensure sub-tasks cover implementation details, tests, and edge cases
+3. Order sub-tasks logically within each parent
+4. Identify all relevant files (source + test files)
+5. Save the complete task list
+
+## Output Format
+
+```markdown
+# [Feature Name] Implementation Tasks
+
+## Relevant Files
+
+- `path/to/component.tsx` - Brief description of relevance
+- `path/to/component.test.tsx` - Tests for component
+- `path/to/hook.ts` - Custom hook for feature logic
+- `path/to/hook.test.ts` - Tests for hook
+
+### Notes
+
+- Unit tests should be placed alongside the code files they test
+- Use `pnpm test` or `make test` (if Makefile present) to run tests
+- Follow existing code patterns in the project
+
+## Instructions for Completing Tasks
+
+**IMPORTANT:** Check off each task as you complete it by changing `- [ ]` to `- [x]`.
+
+Update after completing each sub-task, not just parent tasks.
+
+Example:
+- `- [ ] 1.1 Create component` → `- [x] 1.1 Create component`
+
+## Tasks
+
+- [ ] 0.0 Create feature branch
+  - [ ] 0.1 Create and checkout new branch: `git checkout -b feature/[feature-name]`
+  - [ ] 0.2 Verify you're on the correct branch: `git branch --show-current`
+
+- [ ] 1.0 [First Major Task]
+  - [ ] 1.1 [Sub-task description]
+  - [ ] 1.2 [Sub-task description]
+
+- [ ] 2.0 [Second Major Task]
+  - [ ] 2.1 [Sub-task description]
+
+...
+
+- [ ] N.0 Create pull request and merge
+  - [ ] N.1 Run type checking: `pnpm typecheck` or `make typecheck`
+  - [ ] N.2 Run tests: `pnpm test` or `make test`
+  - [ ] N.3 Commit all changes with descriptive message
+  - [ ] N.4 Push branch to remote: `git push -u origin feature/[feature-name]`
+  - [ ] N.5 Create PR following @pr-workflow
+  - [ ] N.6 Address any bot feedback
+  - [ ] N.7 Merge when all checks pass
+```
+
+## Task Granularity Guidelines
+
+### Parent Tasks (X.0) Should:
+- Represent a logical milestone or deliverable
+- Be completable in roughly 30-60 minutes
+- Be independently testable when possible
+- Have a clear definition of "done"
+
+### Sub-Tasks (X.Y) Should:
+- Be atomic and specific
+- Take 5-15 minutes to complete
+- Have clear success criteria
+- Include testing steps where appropriate
+
+## Example Parent Tasks by Feature Type
+
+**For a New UI Component:**
+- 0.0 Create feature branch
+- 1.0 Create base component structure
+- 2.0 Implement component logic (ViewModel if applicable)
+- 3.0 Add styling with CSS modules
+- 4.0 Write unit tests
+- 5.0 Add Storybook stories
+- 6.0 Integrate into parent component/page
+- 7.0 Create PR and merge
+
+**For an API Integration:**
+- 0.0 Create feature branch
+- 1.0 Define types from API schema
+- 2.0 Create API hooks (query/mutation)
+- 3.0 Implement UI to consume API
+- 4.0 Add error handling and loading states
+- 5.0 Write tests
+- 6.0 Create PR and merge
+
+**For a Bug Fix:**
+- 0.0 Create feature branch
+- 1.0 Reproduce and understand the bug
+- 2.0 Write failing test that captures the bug
+- 3.0 Implement the fix
+- 4.0 Verify test passes and no regressions
+- 5.0 Create PR and merge
+
+## Best Practices
+
+1. **Front-load Investigation:** Include discovery tasks early (reading existing code, understanding patterns)
+2. **Test-Driven When Possible:** Include test writing as explicit tasks, not afterthoughts
+3. **Small Commits:** Structure tasks to encourage incremental progress
+4. **Link Related Items:** Reference other tasks, files, or documentation where helpful
+5. **Include Validation:** Add explicit "verify" or "test" sub-tasks
+
+## Target Audience
+
+Write task lists assuming a **junior developer** will implement them. Be explicit about:
+- Which files to modify
+- What patterns to follow
+- How to test changes
+- What "done" looks like
